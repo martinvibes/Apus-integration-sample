@@ -8,6 +8,16 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Polyfill for process
+      if (typeof process === 'undefined') {
+        window.process = {
+          env: {},
+          version: 'v16.0.0',
+          platform: 'browser'
+        };
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

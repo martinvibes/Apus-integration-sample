@@ -7,5 +7,20 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true
-  }
+  },
+  define: {
+    global: 'globalThis',
+    'process.env': {},
+    'process.version': '"v16.0.0"',
+    'process.platform': '"browser"',
+  },
+  resolve: {
+    alias: {
+      process: 'process/browser',
+      util: 'util',
+    },
+  },
+  optimizeDeps: {
+    include: ['process', 'util'],
+  },
 })

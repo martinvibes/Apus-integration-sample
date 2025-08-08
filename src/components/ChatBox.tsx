@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Input, Button, message as antdMessage } from "antd";
 import { useWallet } from "../contexts/WalletContext";
-import { message as aoMessage, dryrun, createDataItemSigner,result as aoResult } from '@permaweb/aoconnect';
+import { connect, createSigner } from '@permaweb/aoconnect';
 import { config } from "../config";
 
 interface ChatItem {
@@ -29,52 +29,72 @@ const DEFAULT_CHAT: ChatItem[] = [
 ];
 
 const processId = config.aoProcessId;
+const apusHyperbeamNodeUrl = config.apusHyperbeamNodeUrl;
 
 const payApusToken = async () => {
   // TODO: Call backend/contract to pay 1 Apus Token
   return Promise.resolve();
 };
 
-// Poll AO process for inference result
-const pollForResult = async (processId: string, messageId: string): Promise<{ data: string; attestation?: string; reference?: string; status?: string }> => {
+// Poll for result using fetch with 404 retry mechanism
+const pollForResult = async (requestReference: string): Promise<{ data: string; attestation?: string; reference?: string; status?: string }> => {
+  const resultApiUrl = `${apusHyperbeamNodeUrl}/${processId}~process@1.0/now/cache/results/${processId}-${requestReference}/serialize~json@1.0`;
+  
+  console.log("Fetching result from URL:", resultApiUrl);
+  console.log("Request Reference:", requestReference);
+
   try {
-    const result = await dryrun({
-      process: processId,
-      tags: [
-        { name: 'Action', value: 'GetResult' },
-        { name: 'Messageid', value: messageId }
-      ],
-    });
-
-
-    const response = result.Messages?.[0]?.Data;
-    let parsed;
+    const response = await fetch(resultApiUrl);
+    
+    if (response.status === 404) {
+      // 404 means result is not ready yet, continue polling
+      console.log("Result not ready (404), retrying in 5 seconds...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return pollForResult(requestReference);
+    }
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("Received result:", data);
+    
+    // The response has a 'body' field that contains the actual data as a JSON string
+    let parsedBody;
     try {
-      parsed = typeof response === 'string' ? JSON.parse(response) : response;
-    } catch {
-      parsed = response;
+      parsedBody = JSON.parse(data.body);
+      console.log("Parsed body:", parsedBody);
+    } catch (error) {
+      console.error("Failed to parse body:", error);
+      throw new Error('Invalid response format');
     }
-
-    // 修正逻辑：只有 status 为 "success" 时才返回结果，为 "processing" 时继续轮询，其他情况返回错误或原始数据
-    if (parsed && parsed.data && parsed.attestation) {
-      // 有 attestation 说明推理完成
-      return parsed;
-    } else if (parsed && parsed.status === "success") {
-      // 没有 attestation 但 status 为 success，也认为完成
-      return parsed;
-    } else if (parsed && parsed.status === "processing") {
-      // 还在处理中，继续轮询
-      await new Promise(res => setTimeout(res, 5000));
-      return pollForResult(processId, messageId);
-    } else if (!response) {
-      // 没有返回内容
-      return { data: "No response" };
-    } else {
-      // 其他情况直接返回原始数据
-      return { data: response };
+    
+    // Extract result and attestation from the parsed body
+    const result = parsedBody.result;
+    const attestation = parsedBody.attestation;
+    
+    console.log("Extracted result:", result);
+    console.log("Extracted attestation:", attestation);
+    
+    return {
+      data: typeof result === 'string' ? result : JSON.stringify(result),
+      attestation: attestation,
+      reference: requestReference,
+      status: 'success'
+    };
+    
+  } catch (error: unknown) {
+    console.error('Failed to fetch result:', error);
+    
+    // If it's a network error, retry
+    if (error instanceof TypeError || (error instanceof Error && error.message.includes('fetch'))) {
+      console.log("Network error, retrying in 5 seconds...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return pollForResult(requestReference);
     }
-  } catch (e) {
-    throw new Error('Failed to get result: ' + (e instanceof Error ? e.message : e));
+    
+    throw new Error('Failed to get result: ' + (error instanceof Error ? error.message : String(error)));
   }
 };
 
@@ -83,6 +103,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ onAttestationUpdate }) => {
   const [chatHistory, setChatHistory] = useState<ChatItem[]>(DEFAULT_CHAT);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [requestReference, setRequestReference] = useState<string>('');
   const chatListRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when chatHistory changes
@@ -98,51 +119,78 @@ const ChatBox: React.FC<ChatBoxProps> = ({ onAttestationUpdate }) => {
       antdMessage.warning("Please enter a message");
       return;
     }
+    
     setLoading(true);
     try {
       await payApusToken();
+      
+      // Generate unique reference for this request
+      const ref = Date.now().toString();
+      setRequestReference(ref);
+      
       setChatHistory((prev) => [
         ...prev,
         { role: "user", message: prompt, timestamp: Date.now() },
         { role: "tip", message: "Your question is sent. Please wait for the answer...", timestamp: Date.now() },
       ]);
+      
       const currentPrompt = prompt;
       setPrompt("");
 
-      // 1. Send inference request
-      const signer = createDataItemSigner(window.arweaveWallet);
-      const res = await aoMessage({
-        process: processId,
-        tags: [{ name: 'Action', value: 'SendRequest' }],
+      // Setup aoconnect with HyperBEAM node
+      const { request } = connect({
+        MODE: "mainnet", 
+        URL: apusHyperbeamNodeUrl,
+        signer: createSigner(window.arweaveWallet),
+      });
+
+      // Send request using new API structure
+      const data = await request({
+        type: 'Message',
+        path: `/${processId}~process@1.0/push/serialize~json@1.0`,
+        method: "POST",
+        'data-protocol': 'ao',
+        variant: 'ao.N.1',
+        "accept-bundle": "true",
+        "accept-codec": "httpsig@1.0",
+        signingFormat: "ANS-104",
+        target: processId,
+        Action: "Infer",
+        'X-Reference': ref,
         data: currentPrompt,
-        signer,
       });
-      console.log(res);
-      const messageId = res;
+      
+      console.log('Request sent successfully:', data);
 
-      const result = await aoResult({
-        process: processId,
-        message: messageId,
-      });
-      console.log(result);
+      // Poll for result using new fetch method
+      const aiReply = await pollForResult(ref);
+      console.log('AI Reply received:', aiReply);
 
-      const taskRef = result?.Messages?.[1]?.Data;
-      console.log(taskRef);
-
-      // 2. Poll for inference result
-      const aiReply = await pollForResult(processId, taskRef);
-      console.log(aiReply);
-
-      // 3. Update chat history with AI response
+      // Update chat history with AI response
       setChatHistory((prev) => [
         ...prev.slice(0, -1),
         { role: "assistant", message: aiReply.data || String(aiReply), timestamp: Date.now() }
       ]);
 
-      // 4. Update attestation if available
+      // Update attestation if available
       if (aiReply.attestation) {
+        // Handle complex attestation structure
+        let attestationData = aiReply.attestation;
+        let attestationJWT = '';
+        
+        // Extract JWT from the complex attestation structure
+        if (Array.isArray(attestationData) && attestationData.length > 0) {
+          // Look for the first JWT in the attestation array
+          for (const item of attestationData) {
+            if (Array.isArray(item) && item.length === 2 && item[0] === 'JWT') {
+              attestationJWT = item[1];
+              break;
+            }
+          }
+        }
+        
         const newAttestation = {
-          runtimeMeasurement: aiReply.attestation,
+          runtimeMeasurement: attestationJWT || JSON.stringify(attestationData),
           tlsFingerprint: aiReply.reference || "N/A",
           attestedBy: [...config.defaultAttestedBy]
         };
@@ -203,6 +251,21 @@ const ChatBox: React.FC<ChatBoxProps> = ({ onAttestationUpdate }) => {
           </div>
         ))}
       </div>
+      
+      {/* Request Reference Display */}
+      {requestReference && (
+        <div style={{ 
+          marginBottom: 16, 
+          padding: "8px 12px", 
+          background: "rgba(0, 123, 255, 0.1)", 
+          borderRadius: 8,
+          fontSize: "12px",
+          color: "#666"
+        }}>
+          <strong>Request Reference:</strong> {requestReference}
+        </div>
+      )}
+      
       <div style={{ 
         background: "rgba(255, 255, 255, 0.8)", 
         borderRadius: 16, 
