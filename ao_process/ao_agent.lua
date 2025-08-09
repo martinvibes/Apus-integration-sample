@@ -92,7 +92,7 @@ Handlers.add(
 --     reference = "123",
 --     starttime = "1754705621248",
 --     endtime = "1754705610148",
---     data = "I am Gemma, a helpful assistant.",
+--     data = "{"attestation":"","result":"\nI am Gemma, an open-weights AI assistant."}",
 --     error_code = "400", // has this field when the request failed
 --     error_message = "Invalid request format" // has this field when the request failed
 -- }
