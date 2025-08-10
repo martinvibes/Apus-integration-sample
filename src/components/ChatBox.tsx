@@ -38,7 +38,7 @@ const payApusToken = async () => {
 
 // Poll for result using fetch with 404 retry mechanism
 const pollForResult = async (requestReference: string): Promise<{ data: string; attestation?: string; reference?: string; status?: string }> => {
-  const resultApiUrl = `${apusHyperbeamNodeUrl}/${processId}~process@1.0/now/cache/tasks/${processId}-${requestReference}/serialize~json@1.0`;
+  const resultApiUrl = `${apusHyperbeamNodeUrl}/${processId}~process@1.0/now/cache/tasks/${requestReference}/serialize~json@1.0`;
   
   console.log("Fetching result from URL:", resultApiUrl);
   console.log("Request Reference:", requestReference);

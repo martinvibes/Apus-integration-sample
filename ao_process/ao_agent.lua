@@ -1,11 +1,10 @@
 -- Backend AO Process Logic (Core Flow from section 2.5)
--- 'ApusAI = require("apus-ai")'
 
 CurrentReference = CurrentReference or 0 -- Initialize or use existing reference counter
 Tasks = Tasks or {}                      -- Your process's state where results are stored
 Balances = Balances or "0"               -- Store balance information for each reference
 
-APUS_ROUTER = "cplycqOkhJLmFA-xD_hz4T8lEu-ntRqSn_vATPnRvds"
+APUS_ROUTER = "D0na6AspYVzZnZNa7lQHnBt_J92EldK_oFtEPLjIexo"
 
 -- Handler to listen for prompts from your frontend
 Handlers.add(
@@ -13,7 +12,7 @@ Handlers.add(
     Handlers.utils.hasMatchingTag("Action", "Infer"),
     function(msg)
         local reference = msg["X-Reference"] or msg.Reference
-        local requestReference = ao.id .. "-" .. reference
+        local requestReference = reference
         local request = {
             Target = APUS_ROUTER,
             Action = "Infer",
@@ -37,9 +36,7 @@ Handlers.add(
         Send({
             device = 'patch@1.0',
             cache = {
-                tasks = {
-                    [reference] = Tasks[reference]
-                }
+                tasks = Tasks
             }
         })
         ao.send(request)
@@ -51,6 +48,7 @@ Handlers.add(
     Handlers.utils.hasMatchingTag("Action", "Infer-Response"),
     function(msg)
         local reference = msg.Tags["X-Reference"] or ""
+        print(msg)
 
         if msg.Tags["Code"] then
             -- Update task status to failed
@@ -61,6 +59,13 @@ Handlers.add(
                 Tasks[reference].error_code = msg.Tags["Code"]
                 Tasks[reference].endtime = os.time()
             end
+            Send({
+                device = 'patch@1.0',
+                cache = {
+                    tasks = {
+                        [reference] = Tasks[reference] }
+                }
+            })
             return
         end
         Tasks[reference].response = msg.Data or ""
@@ -103,3 +108,4 @@ Handlers.add(
 -- - Ensure your are useing YOUR_PROCESS_ID in the frontend API calls
 -- - You can check CREDITS BALANCE by querying the APUS_ROUTER Patch API
 --  `GET /{APUS_ROUTER}~process@1.0/now/cache/credits/{your_process_id}/serialize~json@1.0`
+-- http://72.46.85.207:8734/D0na6AspYVzZnZNa7lQHnBt_J92EldK_oFtEPLjIexo~process@1.0/now/cache/credits/sNWrdfUcR9kBpRPPPnJKFlel4j_z2rJ89PStNXITMto/serialize~json@1.0
