@@ -38,7 +38,7 @@ const payApusToken = async () => {
 
 // Poll for result using fetch with 404 retry mechanism
 const pollForResult = async (requestReference: string): Promise<{ data: string; attestation?: string; reference?: string; status?: string }> => {
-  const resultApiUrl = `${apusHyperbeamNodeUrl}/${processId}~process@1.0/now/cache/results/${processId}-${requestReference}/serialize~json@1.0`;
+  const resultApiUrl = `${apusHyperbeamNodeUrl}/${processId}~process@1.0/now/cache/tasks/${processId}-${requestReference}/serialize~json@1.0`;
   
   console.log("Fetching result from URL:", resultApiUrl);
   console.log("Request Reference:", requestReference);
@@ -58,31 +58,57 @@ const pollForResult = async (requestReference: string): Promise<{ data: string; 
     }
     
     const data = await response.json();
-    console.log("Received result:", data);
+    console.log("Received response:", data);
     
-    // The response has a 'body' field that contains the actual data as a JSON string
-    let parsedBody;
-    try {
-      parsedBody = JSON.parse(data.body);
-      console.log("Parsed body:", parsedBody);
-    } catch (error) {
-      console.error("Failed to parse body:", error);
-      throw new Error('Invalid response format');
+    // Check the status field
+    const status = data.status;
+    console.log("Task status:", status);
+    
+    if (status === "processing") {
+      // Still processing, retry in 5 seconds
+      console.log("Task still processing, retrying in 5 seconds...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return pollForResult(requestReference);
     }
     
-    // Extract result and attestation from the parsed body
-    const result = parsedBody.result;
-    const attestation = parsedBody.attestation;
+    if (status === "failed") {
+      // Task failed, throw error with error message
+      const errorMessage = data.error_message || "Task failed without error message";
+      console.error("Task failed:", errorMessage);
+      throw new Error(`Task failed: ${errorMessage}`);
+    }
     
-    console.log("Extracted result:", result);
-    console.log("Extracted attestation:", attestation);
+    if (status === "success") {
+      // Task completed successfully, parse the response
+      const responseData = data.response;
+      console.log("Response data:", responseData);
+      
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(responseData);
+        console.log("Parsed response:", parsedResponse);
+      } catch (error) {
+        console.error("Failed to parse response:", error);
+        throw new Error('Invalid response format');
+      }
+      
+      // Extract result and attestation from the parsed response
+      const result = parsedResponse.result;
+      const attestation = parsedResponse.attestation;
+      
+      console.log("Extracted result:", result);
+      console.log("Extracted attestation:", attestation);
+      
+      return {
+        data: typeof result === 'string' ? result : JSON.stringify(result),
+        attestation: attestation,
+        reference: requestReference,
+        status: 'success'
+      };
+    }
     
-    return {
-      data: typeof result === 'string' ? result : JSON.stringify(result),
-      attestation: attestation,
-      reference: requestReference,
-      status: 'success'
-    };
+    // Unknown status
+    throw new Error(`Unknown task status: ${status}`);
     
   } catch (error: unknown) {
     console.error('Failed to fetch result:', error);
