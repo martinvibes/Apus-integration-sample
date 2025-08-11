@@ -10,12 +10,6 @@ A React-based chat application with attestation using AO Network and Arweave Wal
 - TypeScript support with strict type checking
 - Centralized configuration management
 
-## Quick Start
-```bash
-npm install
-npm run dev
-```
-
 ## Configuration
 - Update the configuration in `src/config/index.ts`
 - Main configuration includes:
@@ -102,6 +96,12 @@ The AO process code is located in `ao_process/ao_agent.lua`. This process:
 2. **AO Process forwards** → APUS AI service processes the request
 3. **AI service responds** → AO Process stores result in cache
 4. **Frontend retrieves** → Results are fetched via HTTP API
+
+## Quick Start
+```bash
+npm install
+npm run dev
+```
 
 ## Tech Stack
 - React 19 + TypeScript + Vite
