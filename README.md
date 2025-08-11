@@ -47,7 +47,9 @@ npm i -g https://preview_ao.arweave.net
    aos my_process
    ```
 2. **Select aos:**
-   You may need to select the default `aos` option when prompted. There is no need to select `hyper-hos`.
+   When prompted, select the default `aos` option. There is no need to select `hyper-hos`.
+
+   ![aos selection example](./aos_selection.png)
 
 3. **Trust APUS node operator:**
    ```bash
