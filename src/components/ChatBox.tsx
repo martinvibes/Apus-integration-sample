@@ -23,7 +23,7 @@ interface ChatBoxProps {
 const DEFAULT_CHAT: ChatItem[] = [
   {
     role: "tip",
-    message: "Hi, I'm Qwen! Please type your question below. Enjoy!",
+    message: "Hi, I’m Apus Assistant! Ask me anything below — let’s get started!",
     timestamp: Date.now(),
   },
 ];
