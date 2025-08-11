@@ -46,8 +46,10 @@ npm i -g https://preview_ao.arweave.net
    ```bash
    aos my_process
    ```
+2. **Select aos:**
+   You may need to select the default `aos` option when prompted. There is no need to select `hyper-hos`.
 
-2. **Trust APUS node operator:**
+3. **Trust APUS node operator:**
    ```bash
    ao.authorities[2] = "lpJ5Edz_8DbNnVDL0XdbsY9vCOs45NACzfI4jvo4Ba8"
    ```
@@ -62,6 +64,10 @@ npm i -g https://preview_ao.arweave.net
 2. **Deploy the process:**
    ```bash
    aos my_process --mainnet http://72.46.85.207:8734
+   ```
+2. **Load the AO agent code:**
+   ```bash
+   .load ao_agent.lua
    ```
 
 ### 4. Update Configuration
