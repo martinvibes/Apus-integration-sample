@@ -4,7 +4,7 @@ CurrentReference = CurrentReference or 0 -- Initialize or use existing reference
 Tasks = Tasks or {}                      -- Your process's state where results are stored
 Balances = Balances or "0"               -- Store balance information for each reference
 
-APUS_ROUTER = "ZIc9924GI_wMzPayOZAgVjaxasNq1rIQwdSZseGoh7M"
+APUS_ROUTER = "Bf6JJR2tl2Wr38O2-H6VctqtduxHgKF-NzRB9HhTRzo"
 
 -- Handler to listen for prompts from your frontend
 Handlers.add(
