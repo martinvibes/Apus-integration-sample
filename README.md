@@ -50,14 +50,14 @@ npm i -g https://preview_ao.arweave.net
    ao.authorities[2] = "lpJ5Edz_8DbNnVDL0XdbsY9vCOs45NACzfI4jvo4Ba8"
    ```
 
-### 3. Deploy the AO Process
+### 3. Deploy the AO Process on a HyperBEAM Node
 
 1. **Navigate to the ao_process directory:**
    ```bash
    cd ao_process
    ```
 
-2. **Deploy the process:**
+2. **Quit the process from lagecy network and deploy the process:**
    ```bash
    aos my_process --mainnet http://72.46.85.207:8734
    ```
