@@ -3,5 +3,5 @@ declare global {
     arweaveWallet: unknown;
   }
 }
-
+ 
 export {}; 

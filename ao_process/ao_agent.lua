@@ -1,3 +1,5 @@
+local json = require("json")
+
 -- Backend AO Process Logic (Core Flow from section 2.5)
 
 CurrentReference = CurrentReference or 0 -- Initialize or use existing reference counter
@@ -79,6 +81,20 @@ Handlers.add(
                     [reference] = Tasks[reference] }
             }
         })
+    end
+)
+
+Handlers.add(
+    "GetInferResponse",
+    Handlers.utils.hasMatchingTag("Action", "GetInferResponse"),
+    function(msg)
+        local reference = msg.Tags["X-Reference"] or ""
+        print(Tasks[reference])
+        if Tasks[reference] then
+            msg.reply({Data = json.encode(Tasks[reference])})
+        else
+            msg.reply({Data = "Task not found"}) -- if task not found, return error
+        end
     end
 )
 

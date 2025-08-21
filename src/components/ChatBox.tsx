@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Input, Button, message as antdMessage } from "antd";
 import { useWallet } from "../contexts/WalletContext";
-import { connect, createSigner } from '@permaweb/aoconnect';
+import { message as aoMessage, dryrun, createDataItemSigner } from '@permaweb/aoconnect';
 import { config } from "../config";
 
 interface ChatItem {
@@ -36,90 +36,60 @@ const payApusToken = async () => {
   return Promise.resolve();
 };
 
-// Poll for result using fetch with 404 retry mechanism
-const pollForResult = async (requestReference: string): Promise<{ data: string; attestation?: string; reference?: string; status?: string }> => {
-  const resultApiUrl = `${apusHyperbeamNodeUrl}/${processId}~process@1.0/now/cache/tasks/${requestReference}/serialize~json@1.0`;
-  
-  console.log("Fetching result from URL:", resultApiUrl);
-  console.log("Request Reference:", requestReference);
-
+// 使用 aoconnect 的 result 等待消息处理完成
+const pollForResult = async (reference: string): Promise<{ data: string; attestation?: any; reference?: string; status?: string }> => {
   try {
-    const response = await fetch(resultApiUrl);
-    
-    if (response.status === 404) {
-      // 404 means result is not ready yet, continue polling
-      console.log("Result not ready (404), retrying in 5 seconds...");
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      return pollForResult(requestReference);
+    const res = await dryrun({
+      process: processId,
+      tags: [
+        { name: 'Action', value: 'GetInferResponse' },
+        { name: 'X-Reference', value: reference },
+      ],
+    });
+
+    const raw = res?.Messages?.[0]?.Data;
+    let parsed: any;
+    try {
+      parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch {
+      parsed = raw;
     }
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+
+    // 兼容不同结构：优先解析 status 与 response（response 为 JSON 字符串）
+    const status = parsed?.status ?? 'success';
+    if (status === 'processing') {
+      await new Promise(resolve => setTimeout(resolve, 20000));
+      return pollForResult(reference);
     }
-    
-    const data = await response.json();
-    console.log("Received response:", data);
-    
-    // Check the status field
-    const status = data.status;
-    console.log("Task status:", status);
-    
-    if (status === "processing") {
-      // Still processing, retry in 5 seconds
-      console.log("Task still processing, retrying in 5 seconds...");
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      return pollForResult(requestReference);
+    if (status === 'failed') {
+      const msg = parsed?.error_message || 'Task failed';
+      throw new Error(msg);
     }
-    
-    if (status === "failed") {
-      // Task failed, throw error with error message
-      const errorMessage = data.error_message || "Task failed without error message";
-      console.error("Task failed:", errorMessage);
-      throw new Error(`Task failed: ${errorMessage}`);
+
+    // 解析内层 response
+    let inner: any = undefined;
+    try {
+      inner = parsed?.response
+        ? (typeof parsed.response === 'string' ? JSON.parse(parsed.response) : parsed.response)
+        : undefined;
+    } catch {
+      inner = undefined;
     }
-    
-    if (status === "success") {
-      // Task completed successfully, parse the response
-      const responseData = data.response;
-      console.log("Response data:", responseData);
-      
-      let parsedResponse;
-      try {
-        parsedResponse = JSON.parse(responseData);
-        console.log("Parsed response:", parsedResponse);
-      } catch (error) {
-        console.error("Failed to parse response:", error);
-        throw new Error('Invalid response format');
-      }
-      
-      // Extract result and attestation from the parsed response
-      const result = parsedResponse.result;
-      const attestation = parsedResponse.attestation;
-      
-      console.log("Extracted result:", result);
-      console.log("Extracted attestation:", attestation);
-      
-      return {
-        data: typeof result === 'string' ? result : JSON.stringify(result),
-        attestation: attestation,
-        reference: requestReference,
-        status: 'success'
-      };
-    }
-    
-    // Unknown status
-    throw new Error(`Unknown task status: ${status}`);
-    
-  } catch (error: unknown) {
-    console.error('Failed to fetch result:', error);
-    
-    // If it's a network error, retry
-    if (error instanceof TypeError || (error instanceof Error && error.message.includes('fetch'))) {
-      console.log("Network error, retrying in 5 seconds...");
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      return pollForResult(requestReference);
-    }
-    
+
+    const resultText = (inner?.result ?? inner?.data ?? inner)
+      ?? (parsed?.result ?? parsed?.data)
+      ?? (typeof parsed === 'string' ? parsed : JSON.stringify(parsed));
+
+    const attestation = inner?.attestation ?? parsed?.attestation;
+    const resolvedRef = parsed?.reference ?? reference;
+
+    return {
+      data: typeof resultText === 'string' ? resultText : JSON.stringify(resultText),
+      attestation,
+      reference: resolvedRef,
+      status: 'success',
+    };
+  } catch (error) {
     throw new Error('Failed to get result: ' + (error instanceof Error ? error.message : String(error)));
   }
 };
@@ -150,7 +120,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ onAttestationUpdate }) => {
     try {
       await payApusToken();
       
-      // Generate unique reference for this request
+      // Unique reference for UX 显示（非必需用于 aoconnect）
       const ref = Date.now().toString();
       setRequestReference(ref);
       
@@ -163,35 +133,23 @@ const ChatBox: React.FC<ChatBoxProps> = ({ onAttestationUpdate }) => {
       const currentPrompt = prompt;
       setPrompt("");
 
-      // Setup aoconnect with HyperBEAM node
-      const { request } = connect({
-        MODE: "mainnet", 
-        URL: apusHyperbeamNodeUrl,
-        signer: createSigner(window.arweaveWallet),
-      });
+      // 使用浏览器钱包签名器
+      const signer = createDataItemSigner((window as any).arweaveWallet);
 
-      // Send request using new API structure
-      const data = await request({
-        type: 'Message',
-        path: `/${processId}~process@1.0/push/serialize~json@1.0`,
-        method: "POST",
-        'data-protocol': 'ao',
-        variant: 'ao.N.1',
-        "accept-bundle": "true",
-        "accept-codec": "httpsig@1.0",
-        signingFormat: "ANS-104",
-        target: processId,
-        Action: "Infer",
-        'X-Reference': ref,
+      // 通过 aoconnect.message 发送请求到 AO 进程
+      const mid = await aoMessage({
+        process: processId,
+        tags: [
+          { name: 'Action', value: 'Infer' },
+          { name: 'X-Reference', value: ref },
+        ],
         data: currentPrompt,
+        signer,
       });
-      
-      console.log('Request sent successfully:', data);
 
-      // Poll for result using new fetch method
+      // 使用 dryrun 通过引用查询推理结果
       const aiReply = await pollForResult(ref);
-      console.log('AI Reply received:', aiReply);
-
+      
       // Update chat history with AI response
       setChatHistory((prev) => [
         ...prev.slice(0, -1),
@@ -204,9 +162,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ onAttestationUpdate }) => {
         let attestationData = aiReply.attestation;
         let attestationJWT = '';
         
-        // Extract JWT from the complex attestation structure
         if (Array.isArray(attestationData) && attestationData.length > 0) {
-          // Look for the first JWT in the attestation array
           for (const item of attestationData) {
             if (Array.isArray(item) && item.length === 2 && item[0] === 'JWT') {
               attestationJWT = item[1];

@@ -32,7 +32,7 @@ if (root) {
         <App />
       </ConfigProvider>
     </ArweaveWalletKit>
-  );
+);
   
   console.log("React app rendered successfully");
 } else {
