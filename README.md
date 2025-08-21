@@ -34,39 +34,28 @@ This project includes an AO process that handles AI inference requests. Follow t
 npm i -g https://preview_ao.arweave.net
 ```
 
-### 2. Spawn your process & trust APUS HyperBEAM Node
-
-1. **Spawn your process:**
-   ```bash
-   aos my_process
-   ```
-2. **Select aos:**
-   When prompted, select the default `aos` option. There is no need to select `hyper-hos`.
-
-   ![aos selection example](./aos_selection.png)
-
-3. **Trust APUS node operator:**
-   ```bash
-   ao.authorities[2] = "lpJ5Edz_8DbNnVDL0XdbsY9vCOs45NACzfI4jvo4Ba8"
-   ```
-
-### 3. Deploy the AO Process on a HyperBEAM Node
-
+### 2. Spawn your process & deploy the AO Process
+ Clone the repo to your computer.
 1. **Navigate to the ao_process directory:**
    ```bash
    cd ao_process
    ```
 
-2. **Quit the process from lagecy network and deploy the process:**
+2. **Spawn your process:**
    ```bash
-   aos my_process --mainnet http://72.46.85.207:8734
+   aos my_process
    ```
-2. **Load the AO agent code:**
+3. **Select aos:**
+   When prompted, select the default `aos` option. There is no need to select `hyper-hos`.
+
+   ![aos selection example](./aos_selection.png)
+
+4. **Load the AO agent code:**
    ```bash
    .load ao_agent.lua
    ```
 
-### 4. Update Configuration
+### 3. Update Configuration
 
 After deploying your AO process, update the process ID in `src/config/index.ts`:
 
@@ -81,7 +70,7 @@ export const config = {
 } as const;
 ```
 
-### 5. AO Process Code
+### 4. AO Process Code
 
 The AO process code is located in `ao_process/ao_agent.lua`. This process:
 
