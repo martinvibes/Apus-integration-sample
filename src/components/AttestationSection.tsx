@@ -15,7 +15,6 @@ const AttestationSection: React.FC<AttestationSectionProps> = ({
   runtimeMeasurement,
   attestedBy = [...config.defaultAttestedBy]
 }) => {
-  // 格式化长字符串，每行显示固定字符数
   const formatLongString = (str: string, charsPerLine: number = 20) => {
     if (!str) return "No attestation data available";
     

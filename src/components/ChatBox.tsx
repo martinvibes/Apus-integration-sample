@@ -36,7 +36,7 @@ const payApusToken = async () => {
   return Promise.resolve();
 };
 
-// 使用 aoconnect 的 result 等待消息处理完成
+// use aoconnect's result to wait for message processing to complete
 const pollForResult = async (reference: string): Promise<{ data: string; attestation?: any; reference?: string; status?: string }> => {
   try {
     const res = await dryrun({
@@ -55,7 +55,7 @@ const pollForResult = async (reference: string): Promise<{ data: string; attesta
       parsed = raw;
     }
 
-    // 兼容不同结构：优先解析 status 与 response（response 为 JSON 字符串）
+    // handle different structures: parse status and response first (response is a JSON string)
     const status = parsed?.status ?? 'success';
     if (status === 'processing') {
       await new Promise(resolve => setTimeout(resolve, 20000));
@@ -66,7 +66,7 @@ const pollForResult = async (reference: string): Promise<{ data: string; attesta
       throw new Error(msg);
     }
 
-    // 解析内层 response
+    // parse inner response
     let inner: any = undefined;
     try {
       inner = parsed?.response
@@ -120,7 +120,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ onAttestationUpdate }) => {
     try {
       await payApusToken();
       
-      // Unique reference for UX 显示（非必需用于 aoconnect）
+      // Unique reference for UX display (not required for aoconnect)
       const ref = Date.now().toString();
       setRequestReference(ref);
       
@@ -133,10 +133,10 @@ const ChatBox: React.FC<ChatBoxProps> = ({ onAttestationUpdate }) => {
       const currentPrompt = prompt;
       setPrompt("");
 
-      // 使用浏览器钱包签名器
+      // use browser wallet signer
       const signer = createDataItemSigner((window as any).arweaveWallet);
 
-      // 通过 aoconnect.message 发送请求到 AO 进程
+      // send request to AO process via aoconnect.message
       const mid = await aoMessage({
         process: processId,
         tags: [
@@ -147,7 +147,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ onAttestationUpdate }) => {
         signer,
       });
 
-      // 使用 dryrun 通过引用查询推理结果
+      // use dryrun to query inference result by reference
       const aiReply = await pollForResult(ref);
       
       // Update chat history with AI response
@@ -158,7 +158,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ onAttestationUpdate }) => {
 
       // Update attestation if available
       if (aiReply.attestation) {
-        // Handle complex attestation structure
+        // handle complex attestation structure
         let attestationData = aiReply.attestation;
         let attestationJWT = '';
         
