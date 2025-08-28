@@ -1,26 +1,16 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+// run npm create vite@latest to generate this file
+// vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 5173,
-    host: true
-  },
-  define: {
-    global: 'globalThis',
-    'process.env': {},
-    'process.version': '"v16.0.0"',
-    'process.platform': '"browser"',
-  },
   resolve: {
     alias: {
-      process: 'process/browser',
-      util: 'util',
+      crypto: "crypto-browserify",
+      stream: "stream-browserify",
     },
   },
-  optimizeDeps: {
-    include: ['process', 'util'],
-  },
-})
+  plugins: [react(), nodePolyfills()],
+});

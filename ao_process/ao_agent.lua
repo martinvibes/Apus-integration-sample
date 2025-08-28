@@ -13,7 +13,7 @@ Handlers.add(
     "SendInfer",
     Handlers.utils.hasMatchingTag("Action", "Infer"),
     function(msg)
-        local reference = msg["X-Reference"] or msg.Reference
+        local reference = msg.Tags["X-Reference"] or msg.Reference
         local requestReference = reference
         local request = {
             Target = APUS_ROUTER,
@@ -21,11 +21,11 @@ Handlers.add(
             ["X-Prompt"] = msg.Data,
             ["X-Reference"] = reference
         }
-        if msg["X-Session"] then
-            request["X-Session"] = msg["X-Session"]
+        if msg.Tags["X-Session"] then
+            request["X-Session"] = msg.Tags["X-Session"]
         end
-        if msg["X-Options"] then
-            request["X-Options"] = msg["X-Options"]
+        if msg.Tags["X-Options"] then
+            request["X-Options"] = msg.Tags["X-Options"]
         end
         Tasks[requestReference] = {
             prompt = request["X-Prompt"],
@@ -42,11 +42,17 @@ Handlers.add(
             }
         })
         ao.send(request)
+        
+        -- Reply immediately to the frontend with the task reference
+        msg.reply({
+            TaskRef = reference,
+            Data = "request accepted, taskRef: " .. reference
+        })
     end
 )
 
 Handlers.add(
-    "AcceptResponse",
+    "Infer-Response",
     Handlers.utils.hasMatchingTag("Action", "Infer-Response"),
     function(msg)
         local reference = msg.Tags["X-Reference"] or ""
