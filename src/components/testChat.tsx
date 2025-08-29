@@ -70,11 +70,10 @@ export default function TestChat() {
             { name: "X-Options", value: JSON.stringify(Options) },
           ],
           data: promptText, // Send the actual prompt in data field
-          signer: createDataItemSigner(window.arweaveWallet),
+          signer: createDataItemSigner((window as any).arweaveWallet),
         });
 
         console.log("reference sent: xxxxxxxxxxxxxx", reference);
-
         console.log("Message ID xxxxxxxxxxxxxxxxxxxxx:", messageId);
 
         const messageResult = await result({
@@ -83,22 +82,45 @@ export default function TestChat() {
         });
 
         console.log("Message Result: xxxxxxxxxxxxxx", messageResult);
-
-        console.log("Message Result: xxxxxxxxxxxxxx", messageResult.Output);
-
         console.log(
           "Message Result Messages: xxxxxxxxxxxxxx",
           messageResult.Messages
         );
 
+        // Extract taskRef from the response
+        if (messageResult.Messages && messageResult.Messages.length > 0) {
+          const responseMessage = messageResult.Messages.find(
+            (msg) =>
+              msg.Tags &&
+              msg.Tags.find(
+                (tag: { name: string; value: string }) => tag.name === "Data"
+              )
+          );
+
+          if (responseMessage) {
+            const dataTag = responseMessage.Tags.find(
+              (tag: { name: string; value: string }) => tag.name === "Data"
+            );
+            if (dataTag && dataTag.value) {
+              console.log("Response data:", dataTag.value);
+              // Extract taskRef from the response
+              const taskRefMatch = dataTag.value.match(/taskRef: (.+)/);
+              if (taskRefMatch) {
+                console.log("TaskRef extracted:", taskRefMatch[1]);
+              }
+            }
+          }
+        }
+
         return { messageId, reference, messageResult };
       } catch (error) {
         console.error("Error in sendPrompt:", error);
         setIsLoading(false);
+        throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries();
+      queryClient.invalidateQueries({ queryKey: ["chatResponse"] });
     },
     onError: (error) => {
       console.error("Error in sendPrompt:", error);
@@ -108,7 +130,7 @@ export default function TestChat() {
 
   // Get response using dryrun with GetInferResponse action
   const getResponse = useMutation({
-    mutationKey: ["Infer-Response"],
+    mutationKey: ["GetInferResponse"],
     mutationFn: async () => {
       if (!requestReference) {
         throw new Error("No request reference available");
@@ -252,7 +274,7 @@ export default function TestChat() {
         />
         <button
           type="button"
-          disabled={sendPrompt.isPending || !prompt.trim()}
+          disabled={isLoading || !prompt.trim()}
           onClick={handleSendPrompt}
           style={{
             padding: "0.5rem 1rem",
@@ -263,7 +285,7 @@ export default function TestChat() {
             cursor: "pointer",
           }}
         >
-          {sendPrompt.isPending ? "Sending..." : "Send"}
+          {isLoading ? "Sending..." : "Send"}
         </button>
       </div>
 

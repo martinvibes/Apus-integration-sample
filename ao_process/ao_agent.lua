@@ -52,7 +52,7 @@ Handlers.add(
 )
 
 Handlers.add(
-    "Infer-Response",
+    "AcceptResponse",
     Handlers.utils.hasMatchingTag("Action", "Infer-Response"),
     function(msg)
         local reference = msg.Tags["X-Reference"] or ""
